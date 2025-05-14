@@ -2,122 +2,98 @@
 
 set -e
 
-check_requirements() {
-  echo "[+] Updating packages..."
-  opkg update
+# Обновить список пакетов
+opkg update
 
-  for pkg in curl jq coreutils-base64; do
-    if ! opkg list-installed | grep -q "^$pkg"; then
-      echo "[+] Installing $pkg..."
-      opkg install "$pkg"
-    fi
-  done
-}
+# Установка jq, curl, base64
+opkg install jq curl coreutils-base64
 
-install_awg() {
-  echo "[+] Installing AmneziaWG packages..."
-  PKGARCH=$(opkg print-architecture | awk 'BEGIN {max=0} {if ($3 > max) {max = $3; arch = $2}} END {print arch}')
-  VERSION=$(ubus call system board | jsonfilter -e '@.release.version')
-  TARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 1)
-  SUBTARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 2)
-  PKGPOSTFIX="_v${VERSION}_${PKGARCH}_${TARGET}_${SUBTARGET}.ipk"
-  BASE_URL="https://github.com/Slava-Shchipunov/awg-openwrt/releases/download/v${VERSION}"
+# Определение архитектуры
+PKGARCH=$(opkg print-architecture | awk 'BEGIN {max=0} {if ($3 > max) {max = $3; arch = $2}} END {print arch}')
+VERSION=$(ubus call system board | jsonfilter -e '@.release.version')
+TARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 1)
+SUBTARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 2)
+PKGPOSTFIX="_v${VERSION}_${PKGARCH}_${TARGET}_${SUBTARGET}.ipk"
 
-  mkdir -p /tmp/amneziawg
-  cd /tmp/amneziawg
+BASE_URL="https://github.com/Slava-Shchipunov/awg-openwrt/releases/download/v${VERSION}"
+TMP_DIR="/tmp/amneziawg"
+mkdir -p "$TMP_DIR"
 
-  for pkg in kmod-amneziawg amneziawg-tools luci-app-amneziawg; do
-    FILE="${pkg}${PKGPOSTFIX}"
-    if ! opkg list-installed | grep -q "^$pkg"; then
-      echo "[+] Downloading $FILE..."
-      wget -q "${BASE_URL}/${FILE}" -O "$FILE"
-      opkg install "$FILE"
-    else
-      echo "[✓] $pkg already installed"
-    fi
-  done
-}
+# Скачиваем и устанавливаем пакеты
+for PKG in kmod-amneziawg amneziawg-tools luci-app-amneziawg; do
+  FILE="${PKG}${PKGPOSTFIX}"
+  URL="${BASE_URL}/${FILE}"
+  echo "Installing $PKG..."
+  wget -q -O "$TMP_DIR/$FILE" "$URL"
+  opkg install "$TMP_DIR/$FILE"
+done
 
-get_warp_config() {
-  echo "[+] Getting WARP config from online service..."
-  RESPONSE=$(curl -s 'https://warp.llimonix.pw/api/warp' \
-    -H 'Content-Type: application/json' \
-    --data-raw '{"selectedServices":[],"siteMode":"all","deviceType":"computer"}')
+# Запрос конфига WARP
+warp_config=$(curl -s https://warp.llimonix.pw/api/warp \
+  -H "Content-Type: application/json" \
+  --data-raw '{"selectedServices":[],"siteMode":"all","deviceType":"computer"}')
 
-  echo "$RESPONSE" | jq -r '.content.configBase64' | base64 -d
-}
+success=$(echo "$warp_config" | jq -r '.success')
+if [ "$success" != "true" ]; then
+  echo "WARP config fetch failed."
+  exit 1
+fi
 
-parse_and_configure() {
-  CONFIG=$(get_warp_config)
+b64=$(echo "$warp_config" | jq -r '.content.configBase64')
+config=$(echo "$b64" | base64 -d)
 
-  echo "$CONFIG" > /tmp/warp.conf
-  echo "[+] Parsing WARP config..."
+# Парсинг WARP конфига
+eval $(echo "$config" | grep = | sed 's/\r//' | awk -F= '{printf "%s=\"%s\"\n", $1, $2}')
 
-  PRIVATE_KEY=$(grep PrivateKey /tmp/warp.conf | cut -d= -f2 | tr -d ' ')
-  ADDRESS=$(grep Address /tmp/warp.conf | cut -d= -f2 | tr -d ' ')
-  PUBLIC_KEY=$(grep PublicKey /tmp/warp.conf | cut -d= -f2 | tr -d ' ')
-  ENDPOINT=$(grep Endpoint /tmp/warp.conf | cut -d= -f2 | tr -d ' ')
-  ENDPOINT_IP=$(echo "$ENDPOINT" | cut -d: -f1)
-  ENDPOINT_PORT=$(echo "$ENDPOINT" | cut -d: -f2)
+INTERFACE_NAME="awgwarp"
+ZONE_NAME="awg"
 
-  echo "[+] Applying UCI configuration..."
+# Создание UCI-конфигов
+uci batch <<EOF
+set network.${INTERFACE_NAME}=interface
+set network.${INTERFACE_NAME}.proto='amneziawg'
+set network.${INTERFACE_NAME}.private_key='${PrivateKey}'
+set network.${INTERFACE_NAME}.awg_jc='${Jc}'
+set network.${INTERFACE_NAME}.awg_jmin='${Jmin}'
+set network.${INTERFACE_NAME}.awg_jmax='${Jmax}'
+set network.${INTERFACE_NAME}.awg_s1='${S1}'
+set network.${INTERFACE_NAME}.awg_s2='${S2}'
+set network.${INTERFACE_NAME}.awg_h1='${H1}'
+set network.${INTERFACE_NAME}.awg_h2='${H2}'
+set network.${INTERFACE_NAME}.awg_h3='${H3}'
+set network.${INTERFACE_NAME}.awg_h4='${H4}'
+add_list network.${INTERFACE_NAME}.addresses='${Address}'
+add network amneziawg_peer
+set network.@amneziawg_peer[-1].description='warp_peer'
+set network.@amneziawg_peer[-1].public_key='${PublicKey}'
+set network.@amneziawg_peer[-1].endpoint_host='${EndpointIP}'
+set network.@amneziawg_peer[-1].endpoint_port='${EndpointPort}'
+set network.@amneziawg_peer[-1].allowed_ips='0.0.0.0/0'
+set network.@amneziawg_peer[-1].persistent_keepalive='25'
+commit network
+EOF
 
-  uci set network.awg10=interface
-  uci set network.awg10.proto='amneziawg'
-  uci set network.awg10.private_key="$PRIVATE_KEY"
-  uci add_list network.awg10.addresses="$ADDRESS"
-  uci set network.awg10.awg_jc='3'
-  uci set network.awg10.awg_jmin='30'
-  uci set network.awg10.awg_jmax='40'
-  uci set network.awg10.awg_s1='3'
-  uci set network.awg10.awg_s2='2'
-  uci set network.awg10.awg_h1='1'
-  uci set network.awg10.awg_h2='2'
-  uci set network.awg10.awg_h3='3'
-  uci set network.awg10.awg_h4='4'
-  uci set network.awg10.nohostroute='1'
+# Настройка файрвола
+if ! uci show firewall | grep -q "@zone.*name='${ZONE_NAME}'"; then
+  uci add firewall zone
+  uci set firewall.@zone[-1].name="$ZONE_NAME"
+  uci set firewall.@zone[-1].network="$INTERFACE_NAME"
+  uci set firewall.@zone[-1].input='REJECT'
+  uci set firewall.@zone[-1].output='ACCEPT'
+  uci set firewall.@zone[-1].forward='REJECT'
+  uci set firewall.@zone[-1].masq='1'
+  uci set firewall.@zone[-1].mtu_fix='1'
+fi
 
-  uci add network amneziawg_awg10
-  uci set network.@amneziawg_awg10[-1].name='awg10_peer'
-  uci set network.@amneziawg_awg10[-1].public_key="$PUBLIC_KEY"
-  uci set network.@amneziawg_awg10[-1].endpoint_host="$ENDPOINT_IP"
-  uci set network.@amneziawg_awg10[-1].endpoint_port="$ENDPOINT_PORT"
-  uci set network.@amneziawg_awg10[-1].persistent_keepalive='25'
-  uci set network.@amneziawg_awg10[-1].allowed_ips='0.0.0.0/0'
-  uci commit network
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='lan'
+uci set firewall.@forwarding[-1].dest="$ZONE_NAME"
+uci commit firewall
 
-  if ! uci show firewall | grep -q "@zone.*name='awg'"; then
-    uci add firewall zone
-    uci set firewall.@zone[-1].name='awg'
-    uci set firewall.@zone[-1].network='awg10'
-    uci set firewall.@zone[-1].input='REJECT'
-    uci set firewall.@zone[-1].output='ACCEPT'
-    uci set firewall.@zone[-1].forward='REJECT'
-    uci set firewall.@zone[-1].masq='1'
-    uci set firewall.@zone[-1].mtu_fix='1'
-    uci commit firewall
-  fi
+# Рестарт сети и файрвола
+/etc/init.d/network restart
+/etc/init.d/firewall restart
 
-  if ! uci show firewall | grep -q "@forwarding.*dest='awg'"; then
-    uci add firewall forwarding
-    uci set firewall.@forwarding[-1].src='lan'
-    uci set firewall.@forwarding[-1].dest='awg'
-    uci commit firewall
-  fi
-}
-
-restart_services() {
-  echo "[+] Restarting services..."
-  /etc/init.d/network restart
-  /etc/init.d/firewall restart
-}
-
-main() {
-  check_requirements
-  install_awg
-  parse_and_configure
-  restart_services
-  echo "[✓] AmneziaWG auto-configuration completed"
-}
-
-main
+# Проверка
+sleep 5
+ping -I $INTERFACE_NAME -c 3 1.1.1.1 > /dev/null && echo "\033[32mAmneziaWG WARP is working.\033[0m" || echo "\033[31mWARP test failed.\033[0m"
