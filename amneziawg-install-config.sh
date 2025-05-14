@@ -320,7 +320,27 @@ install_awg_packages
 checkPackageAndInstall "jq" "1"
 checkPackageAndInstall "curl" "1"
 checkPackageAndInstall "unzip" "1"
-checkPackageAndInstall "sing-box" "1"
+# Проверка и установка sing-box с контролем свободного места
+if opkg list-installed | grep -q "sing-box"; then
+    echo "sing-box already installed..."
+else
+    echo "Checking free space before installing sing-box..."
+    FREE_KB=$(df /overlay | awk 'NR==2 {print $4}')
+    REQUIRED_KB=32370
+
+    if [ "$FREE_KB" -lt "$REQUIRED_KB" ]; then
+        echo "Not enough space to install sing-box. Required: ${REQUIRED_KB} KB, available: ${FREE_KB} KB. Skipping..."
+    else
+        echo "Installing sing-box..."
+        opkg install sing-box
+        if [ $? -eq 0 ]; then
+            echo "sing-box installed successfully"
+        else
+            echo "Error installing sing-box. You can try installing it manually later."
+        fi
+    fi
+fi
+
 # проверяем установлен ли пакет dnsmasq-full
 if opkg list-installed | grep -q dnsmasq-full; then
     echo "dnsmasq-full already installed..."
