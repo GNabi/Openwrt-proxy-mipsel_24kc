@@ -458,9 +458,6 @@ while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
                 fi
             else
                 warp_config=$warpGen
-            fi
-        else
-            warp_config=$warpGen
         fi
     fi
     if [ "$warp_config" = "Error" ]; then
