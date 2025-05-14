@@ -320,27 +320,7 @@ install_awg_packages
 checkPackageAndInstall "jq" "1"
 checkPackageAndInstall "curl" "1"
 checkPackageAndInstall "unzip" "1"
-# Проверка и установка sing-box с контролем свободного места
-if opkg list-installed | grep -q "sing-box"; then
-    echo "sing-box already installed..."
-else
-    echo "Checking free space before installing sing-box..."
-    FREE_KB=$(df /overlay | awk 'NR==2 {print $4}')
-    REQUIRED_KB=32370
-
-    if [ "$FREE_KB" -lt "$REQUIRED_KB" ]; then
-        echo "Not enough space to install sing-box. Required: ${REQUIRED_KB} KB, available: ${FREE_KB} KB. Skipping..."
-    else
-        echo "Installing sing-box..."
-        opkg install sing-box
-        if [ $? -eq 0 ]; then
-            echo "sing-box installed successfully"
-        else
-            echo "Error installing sing-box. You can try installing it manually later."
-        fi
-    fi
-fi
-
+checkPackageAndInstall "sing-box" "1"
 # проверяем установлен ли пакет dnsmasq-full
 if opkg list-installed | grep -q dnsmasq-full; then
     echo "dnsmasq-full already installed..."
@@ -357,7 +337,7 @@ DIR="/etc/config"
 DIR_BACKUP="/root/backup3"
 config_files="network firewall https-dns-proxy youtubeUnblock dhcp"
 URL="https://raw.githubusercontent.com/routerich/RouterichAX3000_configs/refs/heads/main"
-checkPackageAndInstall "luci-app-https-dns-proxy" "0"
+checkPackageAndInstall "https-dns-proxy" "0"
 if [ ! -d "$DIR_BACKUP" ]; then
     echo "Backup files..."
     mkdir -p $DIR_BACKUP
@@ -387,25 +367,17 @@ wget "$url" -O "$destination_file" || {
 }
 echo "Installing opera-proxy..."
 opkg install $destination_file
-if [ -d /etc/sing-box ]; then
-    cat <<EOF > /etc/sing-box/config.json
+cat <<EOF > /etc/sing-box/config.json
 { "log": { "disabled": true, "level": "error" },
 "inbounds": [ { "type": "tproxy", "listen": "::", "listen_port": 1100, "sniff": false } ],
 "outbounds": [ { "type": "http", "server": "127.0.0.1", "server_port": 18080 } ],
 "route": { "auto_detect_interface": true }
 }
 EOF
-else
-    echo "sing-box не установлен — пропускаем создание config.json"
-fi
 echo "Setting sing-box..."
-if opkg list-installed | grep -q sing-box; then
-    uci set sing-box.main.enabled='1' 2>/dev/null || echo "uci: не удалось прописать sing-box.main.enabled"
-    uci set box.main.user='root' 2>/dev/null || echo "uci: не удалось прописать box.main.user"
-    uci commit sing-box
-else
-    echo "sing-box не установлен — пропускаем UCI-настройку"
-fi
+uci set sing-box.main.enabled='1'
+uci set box.main.user='root'
+uci commit sing-box
 nameRule="option name 'Block_UDP_443'"
 str=$(grep -i "$nameRule" /etc/config/firewall)
 if [ -z "$str" ]; then
@@ -426,13 +398,42 @@ if [ -z "$str" ]; then
     uci set firewall.@rule[-1].target='REJECT'
     uci commit firewall
 fi
-is_manual_input_parameters="n"
-countRepeatAWGGen=3
+printf "\033[32;1mAutomatic generate config AmneziaWG WARP (n) or manual input parameters for AmneziaWG (y)...\033[0m\n"
+countRepeatAWGGen=2
+echo "Input manual parameters AmneziaWG? (y/n): "
+read is_manual_input_parameters
 currIter=0
 isExit=0
 while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
     currIter=$(( $currIter + 1 ))
     printf "\033[32;1mCreate and Check AWG WARP... Attempt #$currIter... Please wait...\033[0m\n"
+    if [ "$is_manual_input_parameters" = "y" ] || [ "$is_manual_input_parameters" = "Y" ]; then
+        read -r -p "Enter the private key (from [Interface]):"$'\n' PrivateKey
+        read -r -p "Enter S1 value (from [Interface]):"$'\n' S1
+        read -r -p "Enter S2 value (from [Interface]):"$'\n' S2
+        read -r -p "Enter Jc value (from [Interface]):"$'\n' Jc
+        read -r -p "Enter Jmin value (from [Interface]):"$'\n' Jmin
+        read -r -p "Enter Jmax value (from [Interface]):"$'\n' Jmax
+        read -r -p "Enter H1 value (from [Interface]):"$'\n' H1
+        read -r -p "Enter H2 value (from [Interface]):"$'\n' H2
+        read -r -p "Enter H3 value (from [Interface]):"$'\n' H3
+        read -r -p "Enter H4 value (from [Interface]):"$'\n' H4
+        while true; do
+            read -r -p "Enter internal IP address with subnet, example 192.168.100.5/24 (from [Interface]):"$'\n' Address
+            if echo "$Address" | egrep -oq '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]+)?$'; then
+                break
+            else
+                echo "This IP is not valid. Please repeat"
+            fi
+        done
+        read -r -p "Enter the public key (from [Peer]):"$'\n' PublicKey
+        read -r -p "Enter Endpoint host without port (Domain or IP) (from [Peer]):"$'\n' EndpointIP
+        read -r -p "Enter Endpoint host port (from [Peer]) [51820]:"$'\n' EndpointPort
+        DNS="1.1.1.1"
+        MTU=1280
+        AllowedIPs="0.0.0.0/0"
+        isExit=1
+    else
         warp_config="Error"
         printf "\033[32;1mRequest WARP config... Attempt #1\033[0m\n"
         result=$(requestConfWARP1)
@@ -459,6 +460,9 @@ while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
                 fi
             else
                 warp_config=$warpGen
+            fi
+        else
+            warp_config=$warpGen
         fi
     fi
     if [ "$warp_config" = "Error" ]; then
@@ -645,15 +649,19 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" 
     opkg remove --force-removal-of-dependent-packages $PACKAGE
 fi
 if [ -f "/etc/init.d/podkop" ]; then
+    printf "Podkop installed. Reconfigure on AWG WARP and Opera Proxy? (y/n): \n"
     is_reconfig_podkop="y"
-    if [ "$is_reconfig_podkop" = "y" ]; then
+    read is_reconfig_podkop
+    if [ "$is_reconfig_podkop" = "y" ] || [ "$is_reconfig_podkop" = "Y" ]; then
         cp -f "$path_podkop_config" "$path_podkop_config_backup"
         wget -O "$path_podkop_config" "$URL/config_files/$nameFileReplacePodkop"
         echo "Backup of your config in path '$path_podkop_config_backup'"
         echo "Podkop reconfigured..."
     fi
 else
-is_install_podkop="y"
+    printf "\033[32;1mInstall and configure PODKOP (a tool for point routing of traffic)?? (y/n): \033[0m\n"
+    is_install_podkop="y"
+    read is_install_podkop
     if [ "$is_install_podkop" = "y" ] || [ "$is_install_podkop" = "Y" ]; then
         DOWNLOAD_DIR="/tmp/podkop"
         mkdir -p "$DOWNLOAD_DIR"
@@ -671,7 +679,7 @@ is_install_podkop="y"
     fi
 fi
 printf "\033[32;1mStart and enable service 'https-dns-proxy'...\033[0m\n"
-manage_package "luci-app-https-dns-proxy" "enable" "start"
+manage_package "https-dns-proxy" "enable" "start"
 str=$(grep -i "0 4 * * * wget -O - $URL/configure_zaprets.sh | sh" /etc/crontabs/root)
 if [ ! -z "$str" ]; then
     grep -v "0 4 * * * wget -O - $URL/configure_zaprets.sh | sh" /etc/crontabs/root > /etc/crontabs/temp
@@ -693,12 +701,3 @@ service sing-box restart
 service podkop enable
 service podkop restart
 printf "\033[32;1mConfigured completed...\033[0m\n"
-echo ""
-echo ""
-echo "==================== УСТАНОВКА ЗАВЕРШЕНА ===================="
-echo "Для запуска этого скрипта в автоматическом режиме используйте:"
-echo ""
-echo "wget -O /tmp/amneziawg-install-config.sh https://raw.githubusercontent.com/GNabi/Openwrt-proxy-mipsel_24kc/refs/heads/main/amneziawg-install-config.sh && chmod +x /tmp/amneziawg-install-config.sh && yes | /tmp/amneziawg-install-config.sh | tee /tmp/amneziawg-install.log"
-echo ""
-echo "Лог установки: /tmp/amneziawg-install.log"
-echo "============================================================="
