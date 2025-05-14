@@ -426,41 +426,12 @@ if [ -z "$str" ]; then
     uci set firewall.@rule[-1].target='REJECT'
     uci commit firewall
 fi
-printf "\033[32;1mAutomatic generate config AmneziaWG WARP (n) or manual input parameters for AmneziaWG (y)...\033[0m\n"
-countRepeatAWGGen=2
-echo "Input manual parameters AmneziaWG? (y/n): "
-read is_manual_input_parameters
+is_manual_input_parameters="n"
 currIter=0
 isExit=0
 while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
     currIter=$(( $currIter + 1 ))
     printf "\033[32;1mCreate and Check AWG WARP... Attempt #$currIter... Please wait...\033[0m\n"
-    if [ "$is_manual_input_parameters" = "y" ] || [ "$is_manual_input_parameters" = "Y" ]; then
-        read -r -p "Enter the private key (from [Interface]):"$'\n' PrivateKey
-        read -r -p "Enter S1 value (from [Interface]):"$'\n' S1
-        read -r -p "Enter S2 value (from [Interface]):"$'\n' S2
-        read -r -p "Enter Jc value (from [Interface]):"$'\n' Jc
-        read -r -p "Enter Jmin value (from [Interface]):"$'\n' Jmin
-        read -r -p "Enter Jmax value (from [Interface]):"$'\n' Jmax
-        read -r -p "Enter H1 value (from [Interface]):"$'\n' H1
-        read -r -p "Enter H2 value (from [Interface]):"$'\n' H2
-        read -r -p "Enter H3 value (from [Interface]):"$'\n' H3
-        read -r -p "Enter H4 value (from [Interface]):"$'\n' H4
-        while true; do
-            read -r -p "Enter internal IP address with subnet, example 192.168.100.5/24 (from [Interface]):"$'\n' Address
-            if echo "$Address" | egrep -oq '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]+)?$'; then
-                break
-            else
-                echo "This IP is not valid. Please repeat"
-            fi
-        done
-        read -r -p "Enter the public key (from [Peer]):"$'\n' PublicKey
-        read -r -p "Enter Endpoint host without port (Domain or IP) (from [Peer]):"$'\n' EndpointIP
-        read -r -p "Enter Endpoint host port (from [Peer]) [51820]:"$'\n' EndpointPort
-        DNS="1.1.1.1"
-        MTU=1280
-        AllowedIPs="0.0.0.0/0"
-        isExit=1
     else
         warp_config="Error"
         printf "\033[32;1mRequest WARP config... Attempt #1\033[0m\n"
@@ -677,19 +648,15 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" 
     opkg remove --force-removal-of-dependent-packages $PACKAGE
 fi
 if [ -f "/etc/init.d/podkop" ]; then
-    printf "Podkop installed. Reconfigure on AWG WARP and Opera Proxy? (y/n): \n"
     is_reconfig_podkop="y"
-    read is_reconfig_podkop
-    if [ "$is_reconfig_podkop" = "y" ] || [ "$is_reconfig_podkop" = "Y" ]; then
+    if [ "$is_reconfig_podkop" = "y" ]; then
         cp -f "$path_podkop_config" "$path_podkop_config_backup"
         wget -O "$path_podkop_config" "$URL/config_files/$nameFileReplacePodkop"
         echo "Backup of your config in path '$path_podkop_config_backup'"
         echo "Podkop reconfigured..."
     fi
 else
-    printf "\033[32;1mInstall and configure PODKOP (a tool for point routing of traffic)?? (y/n): \033[0m\n"
-    is_install_podkop="y"
-    read is_install_podkop
+is_install_podkop="y"
     if [ "$is_install_podkop" = "y" ] || [ "$is_install_podkop" = "Y" ]; then
         DOWNLOAD_DIR="/tmp/podkop"
         mkdir -p "$DOWNLOAD_DIR"
@@ -730,11 +697,11 @@ service podkop enable
 service podkop restart
 printf "\033[32;1mConfigured completed...\033[0m\n"
 echo ""
+echo ""
 echo "==================== УСТАНОВКА ЗАВЕРШЕНА ===================="
-echo "Если вы хотите повторно запустить скрипт в полностью автоматическом режиме,"
-echo "используйте следующую команду в одну строку:"
+echo "Для запуска этого скрипта в автоматическом режиме используйте:"
 echo ""
 echo "wget -O /tmp/amneziawg-install-config.sh https://raw.githubusercontent.com/GNabi/Openwrt-proxy-mipsel_24kc/refs/heads/main/amneziawg-install-config.sh && chmod +x /tmp/amneziawg-install-config.sh && yes | /tmp/amneziawg-install-config.sh | tee /tmp/amneziawg-install.log"
 echo ""
-echo "Лог установки сохранён в: /tmp/amneziawg-install.log"
+echo "Лог установки: /tmp/amneziawg-install.log"
 echo "============================================================="
