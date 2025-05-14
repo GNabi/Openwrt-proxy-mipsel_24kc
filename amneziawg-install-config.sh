@@ -701,7 +701,6 @@ is_install_podkop="y"
         wget -O "$path_podkop_config" "$URL/config_files/$nameFileReplacePodkop"
         echo "Podkop installed.."
     fi
-fi
 printf "\033[32;1mStart and enable service 'https-dns-proxy'...\033[0m\n"
 manage_package "https-dns-proxy" "enable" "start"
 str=$(grep -i "0 4 * * * wget -O - $URL/configure_zaprets.sh | sh" /etc/crontabs/root)
