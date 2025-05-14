@@ -428,10 +428,8 @@ if [ -z "$str" ]; then
     uci set firewall.@rule[-1].target='REJECT'
     uci commit firewall
 fi
-printf "\033[32;1mAutomatic generate config AmneziaWG WARP (n) or manual input parameters for AmneziaWG (y)...\033[0m\n"
 countRepeatAWGGen=2
-echo "Input manual parameters AmneziaWG? (y/n): "
-read is_manual_input_parameters
+is_manual_input_parameters="n"
 currIter=0
 isExit=0
 while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
@@ -679,20 +677,16 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" 
     opkg remove --force-removal-of-dependent-packages $PACKAGE
 fi
 if [ -f "/etc/init.d/podkop" ]; then
-    printf "Podkop installed. Reconfigure on AWG WARP and Opera Proxy? (y/n): \n"
     is_reconfig_podkop="y"
-    read is_reconfig_podkop
-    if [ "$is_reconfig_podkop" = "y" ] || [ "$is_reconfig_podkop" = "Y" ]; then
+    if [ "$is_reconfig_podkop" = "y" ]; then
+
         cp -f "$path_podkop_config" "$path_podkop_config_backup"
         wget -O "$path_podkop_config" "$URL/config_files/$nameFileReplacePodkop"
         echo "Backup of your config in path '$path_podkop_config_backup'"
         echo "Podkop reconfigured..."
     fi
 else
-    printf "\033[32;1mInstall and configure PODKOP (a tool for point routing of traffic)?? (y/n): \033[0m\n"
-    is_install_podkop="y"
-    read is_install_podkop
-    if [ "$is_install_podkop" = "y" ] || [ "$is_install_podkop" = "Y" ]; then
+is_install_podkop="y"
         DOWNLOAD_DIR="/tmp/podkop"
         mkdir -p "$DOWNLOAD_DIR"
         podkop_files="podkop_0.2.5-1_all.ipk luci-app-podkop_0.2.5_all.ipk luci-i18n-podkop-ru_0.2.5.ipk"
@@ -731,3 +725,5 @@ service sing-box restart
 service podkop enable
 service podkop restart
 printf "\033[32;1mConfigured completed...\033[0m\n"
+echo ""
+echo "==================== УСТАНОВКА ЗАВЕРШЕНА ===================="
