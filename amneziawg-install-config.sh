@@ -387,17 +387,25 @@ wget "$url" -O "$destination_file" || {
 }
 echo "Installing opera-proxy..."
 opkg install $destination_file
-cat <<EOF > /etc/sing-box/config.json
+if [ -d /etc/sing-box ]; then
+    cat <<EOF > /etc/sing-box/config.json
 { "log": { "disabled": true, "level": "error" },
 "inbounds": [ { "type": "tproxy", "listen": "::", "listen_port": 1100, "sniff": false } ],
 "outbounds": [ { "type": "http", "server": "127.0.0.1", "server_port": 18080 } ],
 "route": { "auto_detect_interface": true }
 }
 EOF
+else
+    echo "sing-box не установлен — пропускаем создание config.json"
+fi
 echo "Setting sing-box..."
-uci set sing-box.main.enabled='1'
-uci set box.main.user='root'
-uci commit sing-box
+if opkg list-installed | grep -q sing-box; then
+    uci set sing-box.main.enabled='1' 2>/dev/null || echo "uci: не удалось прописать sing-box.main.enabled"
+    uci set box.main.user='root' 2>/dev/null || echo "uci: не удалось прописать box.main.user"
+    uci commit sing-box
+else
+    echo "sing-box не установлен — пропускаем UCI-настройку"
+fi
 nameRule="option name 'Block_UDP_443'"
 str=$(grep -i "$nameRule" /etc/config/firewall)
 if [ -z "$str" ]; then
