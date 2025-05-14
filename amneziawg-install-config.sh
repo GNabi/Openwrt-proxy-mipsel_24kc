@@ -432,7 +432,6 @@ isExit=0
 while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
     currIter=$(( $currIter + 1 ))
     printf "\033[32;1mCreate and Check AWG WARP... Attempt #$currIter... Please wait...\033[0m\n"
-    else
         warp_config="Error"
         printf "\033[32;1mRequest WARP config... Attempt #1\033[0m\n"
         result=$(requestConfWARP1)
