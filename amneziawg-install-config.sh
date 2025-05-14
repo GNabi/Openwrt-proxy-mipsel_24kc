@@ -729,3 +729,12 @@ service sing-box restart
 service podkop enable
 service podkop restart
 printf "\033[32;1mConfigured completed...\033[0m\n"
+echo ""
+echo "==================== УСТАНОВКА ЗАВЕРШЕНА ===================="
+echo "Если вы хотите повторно запустить скрипт в полностью автоматическом режиме,"
+echo "используйте следующую команду в одну строку:"
+echo ""
+echo "wget -O /tmp/amneziawg-install-config.sh https://raw.githubusercontent.com/GNabi/Openwrt-proxy-mipsel_24kc/refs/heads/main/amneziawg-install-config.sh && chmod +x /tmp/amneziawg-install-config.sh && yes | /tmp/amneziawg-install-config.sh | tee /tmp/amneziawg-install.log"
+echo ""
+echo "Лог установки сохранён в: /tmp/amneziawg-install.log"
+echo "============================================================="
