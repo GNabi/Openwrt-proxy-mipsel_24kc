@@ -427,6 +427,7 @@ if [ -z "$str" ]; then
     uci commit firewall
 fi
 is_manual_input_parameters="n"
+countRepeatAWGGen=3
 currIter=0
 isExit=0
 while [ $currIter -lt $countRepeatAWGGen ] && [ "$isExit" = "0" ]; do
