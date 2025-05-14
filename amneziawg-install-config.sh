@@ -357,7 +357,7 @@ DIR="/etc/config"
 DIR_BACKUP="/root/backup3"
 config_files="network firewall https-dns-proxy youtubeUnblock dhcp"
 URL="https://raw.githubusercontent.com/routerich/RouterichAX3000_configs/refs/heads/main"
-checkPackageAndInstall "https-dns-proxy" "0"
+checkPackageAndInstall "luci-app-https-dns-proxy" "0"
 if [ ! -d "$DIR_BACKUP" ]; then
     echo "Backup files..."
     mkdir -p $DIR_BACKUP
@@ -670,7 +670,7 @@ is_install_podkop="y"
     fi
 fi
 printf "\033[32;1mStart and enable service 'https-dns-proxy'...\033[0m\n"
-manage_package "https-dns-proxy" "enable" "start"
+manage_package "luci-app-https-dns-proxy" "enable" "start"
 str=$(grep -i "0 4 * * * wget -O - $URL/configure_zaprets.sh | sh" /etc/crontabs/root)
 if [ ! -z "$str" ]; then
     grep -v "0 4 * * * wget -O - $URL/configure_zaprets.sh | sh" /etc/crontabs/root > /etc/crontabs/temp
