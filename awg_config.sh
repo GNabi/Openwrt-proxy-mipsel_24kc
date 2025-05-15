@@ -290,16 +290,6 @@ install_awg_packages
 checkPackageAndInstall "jq" "1"
 checkPackageAndInstall "curl" "1"
 checkPackageAndInstall "unzip" "1"
-# Проверка свободного места и установка sing-box только если хватает памяти
-REQUIRED_SPACE_KB=32370
-AVAILABLE_SPACE_KB=$(df /overlay | awk 'NR==2 {print $4}')
-
-if [ "$AVAILABLE_SPACE_KB" -ge "$REQUIRED_SPACE_KB" ]; then
-    echo "Достаточно памяти ($AVAILABLE_SPACE_KB KB). Устанавливаем sing-box..."
-    checkPackageAndInstall "sing-box" "1"
-else
-    echo "Недостаточно памяти на /overlay ($AVAILABLE_SPACE_KB KB < $REQUIRED_SPACE_KB KB). Пропускаем установку sing-box."
-fi
 
 #проверяем установлени ли пакет dnsmasq-full
 if opkg list-installed | grep -q dnsmasq-full; then
@@ -363,10 +353,6 @@ wget "$url" -O "$destination_file" || { echo "Failed to download the file"; exit
 echo "Installing opera-proxy..."
 opkg install $destination_file
 
-echo "Setting sing-box..."
-uci set sing-box.main.enabled='1'
-uci set sing-box.main.user='root'
-uci commit sing-box
 
 printf "\033[32;1mAutomatic generate config AmneziaWG WARP (n) or manual input parameters for AmneziaWG (y)...\033[0m\n"
 echo "Input manual parameters AmneziaWG? (y/n): "
@@ -642,9 +628,6 @@ sleep 2
 # Включаем интерфейс
 ifup $INTERFACE_NAME
 
-printf  "\033[32;1mService Podkop and Sing-Box restart...\033[0m\n"
-service sing-box enable
-service sing-box restart
 service podkop enable
 service podkop restart
 
