@@ -322,7 +322,6 @@ install_youtubeunblock_packages() {
 }
 echo "Update list packages..."
 opkg update
-opkg install https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-ru
 # проверка и установка пакетов AmneziaWG
 install_awg_packages
 checkPackageAndInstall "jq" "1"
@@ -719,6 +718,7 @@ if [ ! -z "$str" ]; then
     cp -f "/etc/crontabs/temp" "/etc/crontabs/root"
     rm -f "/etc/crontabs/temp"
 fi
+opkg install https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-ru
 # printf "\033[32;1mRestart firewall and network...\033[0m\n"
 service firewall restart
 service network restart
