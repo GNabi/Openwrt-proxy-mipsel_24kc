@@ -1,4 +1,10 @@
 #!/bin/sh
+echo "Проверка подключения к Интернету..."
+ping -c 1 8.8.8.8 >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "Нет доступа к Интернету. Установка невозможна."
+    exit 1
+fi
 install_awg_packages() { # Получение pkgarch с наибольшим приоритетом
 PKGARCH=$(opkg print-architecture | awk 'BEGIN {max=0} {if ($3 > max) {max = $3; arch = $2}} END {print arch}')
 TARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 1)
@@ -50,6 +56,7 @@ else
 fi
 if opkg list-installed | grep -q luci-app-amneziawg; then
     echo "luci-app-amneziawg already installed"
+    opkg install luci-proto-amneziawg
 else
     LUCI_APP_AMNEZIAWG_FILENAME="luci-app-amneziawg${PKGPOSTFIX}"
     DOWNLOAD_URL="${BASE_URL}v${VERSION}/${LUCI_APP_AMNEZIAWG_FILENAME}"
@@ -315,6 +322,7 @@ install_youtubeunblock_packages() {
 }
 echo "Update list packages..."
 opkg update
+opkg install https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-ru
 # проверка и установка пакетов AmneziaWG
 install_awg_packages
 checkPackageAndInstall "jq" "1"
@@ -357,7 +365,7 @@ DIR="/etc/config"
 DIR_BACKUP="/root/backup3"
 config_files="network firewall https-dns-proxy youtubeUnblock dhcp"
 URL="https://raw.githubusercontent.com/routerich/RouterichAX3000_configs/refs/heads/main"
-checkPackageAndInstall "https-dns-proxy" "0"
+# checkPackageAndInstall "https-dns-proxy" "0"
 if [ ! -d "$DIR_BACKUP" ]; then
     echo "Backup files..."
     mkdir -p $DIR_BACKUP
@@ -372,8 +380,10 @@ if [ ! -d "$DIR_BACKUP" ]; then
     done
 fi
 echo "Configure dhcp..."
-uci set dhcp.cfg01411c.strictorder='1'
-uci set dhcp.cfg01411c.filter_aaaa='1'
+# uci set dhcp.cfg01411c.strictorder='1'
+# uci set dhcp.cfg01411c.filter_aaaa='1'
+uci set dhcp.@dnsmasq[0].strictorder='1'
+uci set dhcp.@dnsmasq[0].filter_aaaa='1'
 uci commit dhcp
 echo "Install opera-proxy client..."
 service stop vpn > /dev/null
@@ -710,8 +720,8 @@ if [ ! -z "$str" ]; then
     rm -f "/etc/crontabs/temp"
 fi
 # printf "\033[32;1mRestart firewall and network...\033[0m\n"
-# service firewall restart
-# service network restart
+service firewall restart
+service network restart
 # Отключаем интерфейс
 # ifdown $INTERFACE_NAME
 # Ждем несколько секунд (по желанию)
@@ -723,6 +733,11 @@ service sing-box enable
 service sing-box restart
 service podkop enable
 service podkop restart
+echo "Cleaning up leftover .ipk files..."
+rm -f /tmp/*.ipk
+rm -rf /tmp/amneziawg
+rm -rf /tmp/podkop
+rm -rf /tmp/youtubeUnblock
 printf "\033[32;1mConfigured completed...\033[0m\n"
 echo ""
 echo "==================== УСТАНОВКА ЗАВЕРШЕНА ===================="
