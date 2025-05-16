@@ -378,7 +378,7 @@ uci commit dhcp
 echo "Install opera-proxy client..."
 service stop vpn > /dev/null
 rm -f /usr/bin/vpns /etc/init.d/vpn
-url="https://raw.githubusercontent.com/GNabi/Openwrt-proxy-mipsel_24kc/refs/heads/main/opera-proxy_1.9.0-r1_mipsel_24kc.ipk"
+url="https://github.com/GNabi/Openwrt-proxy-mipsel_24kc/raw/refs/heads/main/opera-proxy_1.9.0_mipsel_24kc.ipk"
 destination_file="/tmp/opera-proxy.ipk"
 echo "Downloading opera-proxy..."
 wget "$url" -O "$destination_file" || {
