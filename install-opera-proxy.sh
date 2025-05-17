@@ -1,5 +1,4 @@
 #!/bin/sh
-. /etc/rc.common
 
 echo "⚙️ Скачивание и установка opera-proxy..."
 cd /tmp
