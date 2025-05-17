@@ -1,5 +1,24 @@
 #!/bin/sh
 
+echo "🧹 Остановка и удаление sing-box..."
+
+# Остановить службу
+/etc/init.d/sing-box stop 2>/dev/null
+/etc/init.d/sing-box disable 2>/dev/null
+
+# Удалить init-файл
+rm -f /etc/init.d/sing-box
+
+# Удалить конфигурации
+rm -f /etc/config/sing-box
+rm -rf /etc/sing-box
+rm -rf /usr/share/sing-box
+
+# Удалить бинарник
+rm -f /usr/bin/sing-box
+
+echo "✅ Sing-box полностью удалён."
+
 echo "===> Установка sing-box..."
 echo "Скачивание бинарника sing-box..."
 wget -O /usr/bin/sing-box https://github.com/GNabi/Openwrt-proxy-mipsel_24kc/raw/refs/heads/main/sing-box_mipsel_24kc
